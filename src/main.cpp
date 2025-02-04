@@ -11,6 +11,9 @@
 #include <BLEService.h>
 #include <BLECharacteristic.h>
 
+// BLE Device name
+#define DEVICE_NAME "PM2.5 Sensor"
+
 // Custom UUIDs for BLE service and characteristics
 
 // Service UUID
@@ -158,7 +161,7 @@ void setup() {
 
     // Initialize BLE
     displayDebugInfo("Initializing BLE...");
-    BLEDevice::init("PM2.5 Sensor");
+    BLEDevice::init(DEVICE_NAME);
     
     // Create BLE Server
     pServer = BLEDevice::createServer();

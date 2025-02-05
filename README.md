@@ -21,7 +21,7 @@ A [PlatformIO](https://platformio.org/project) project for the Seeed Wio Termina
 - I2C device auto-detection
 - Debug information display
 
-## BLE Client/Server Example App
+## BLE Client/Central Example App
 - [Flutter PM2.5 Monitor App](https://github.com/IoT-gamer/flutter_pm2_5_monitor_app)
 
 ## Dependencies

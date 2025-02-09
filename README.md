@@ -8,18 +8,40 @@ A [PlatformIO](https://platformio.org/project) project for the Seeed Wio Termina
 
 - [Seeed Wio Terminal](https://wiki.seeedstudio.com/Wio_Terminal_Intro/)
 - [Grove HM3301 Laser PM2.5 Sensor](https://wiki.seeedstudio.com/Grove-Laser_PM2.5_Sensor-HM3301/)
+- microSD card (FAT32 formatted)
 - I2C grove connection
 
 ## Features
 
-- Real-time particulate matter measurements
-  - PM1.0
-  - PM2.5
-  - PM10.0
-- BLE connectivity for wireless data transmission
-- TFT display showing current readings
-- I2C device auto-detection
-- Debug information display
+- Real-time particulate matter measurements:
+  - PM1.0 (atmospheric)
+  - PM2.5 (atmospheric)
+  - PM10.0 (atmospheric)
+- BLE connectivity:
+  - Device name: "PM2.5 Sensor"
+  - Real-time data notifications
+  - Historical data access
+- TFT display showing:
+  - Current PM readings
+  - BLE connection status
+  - Debug information
+- Data logging:
+  - Readings logged every 5 minutes to SD card
+  - CSV format with timestamps
+  - Automatic file management
+- Historical data:
+  - Hourly averages calculation
+  - 24-hour history retention
+  - Accessible via BLE
+
+## BLE Service Specifications
+
+- Service UUID: `91bad492-b950-4226-aa2b-4ede9fa42f59`
+- Characteristics:
+  - PM1.0: `91bad493-b950-4226-aa2b-4ede9fa42f59` (Read, Notify)
+  - PM2.5: `91bad494-b950-4226-aa2b-4ede9fa42f59` (Read, Notify)
+  - PM10: `91bad495-b950-4226-aa2b-4ede9fa42f59` (Read, Notify)
+  - History: `91bad496-b950-4226-aa2b-4ede9fa42f59` (Read)
 
 ## BLE Client/Central Example App
 - [Flutter PM2.5 Monitor App](https://github.com/IoT-gamer/flutter_pm2_5_monitor_app)
@@ -29,3 +51,18 @@ A [PlatformIO](https://platformio.org/project) project for the Seeed Wio Termina
 - [Seeed_HM330X (Grove PM2.5 Sensor Library)](https://github.com/Seeed-Studio/Seeed_PM2_5_sensor_HM3301)
 - [Seeed_Arduino_rpcBLE](https://github.com/Seeed-Studio/Seeed_Arduino_rpcBLE)
 - [Seeed_Arduino_rpcUnified](https://github.com/Seeed-Studio/Seeed_Arduino_rpcUnified)
+- TFT_eSPI
+- Seeed_Arduino_FS
+- TimeLib
+
+## Data Storage
+
+- Data is stored in `/data/PM_xxxx.csv` files on the SD card
+- CSV format: `Power_Cycle,Timestamp,PM1.0,PM2.5,PM10,Uptime_Sec`
+- Power cycles are tracked in `/data/power_cycle.txt`
+
+## Update Intervals
+
+- Sensor readings: Every 5 seconds
+- Data logging: Every 5 minutes
+- Hourly averages calculation: Every hour

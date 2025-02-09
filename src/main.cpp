@@ -15,6 +15,9 @@
 #include <TimeLib.h>
 #include <vector>
 
+// Pin definitions
+#define LCD_BACKLIGHT (72UL) // LCD backlight control pin
+
 // BLE Device name
 #define DEVICE_NAME "PM2.5 Sensor"
 
@@ -411,6 +414,11 @@ void setup()
     // Initialize serial communication
     Serial.begin(115200);
 
+    // Initialize button and backlight
+    pinMode(WIO_5S_PRESS, INPUT_PULLUP);
+    pinMode(LCD_BACKLIGHT, OUTPUT);
+    digitalWrite(LCD_BACKLIGHT, HIGH); // Turn on backlight initially
+
     // Initialize display
     tft.begin();
     tft.setRotation(3); // Landscape mode
@@ -516,8 +524,21 @@ void loop()
     static unsigned long lastUpdate = 0;
     static unsigned long lastLog = 0;
     static unsigned long lastHourlyCalc = 0;
-
+    static unsigned long lastButtonCheck = 0;
+    static bool backlightOn = true;
+    
     unsigned long currentMillis = millis();
+
+    // Handle button press for backlight toggle
+    if (currentMillis - lastButtonCheck >= 30)
+    { // Debounce delay
+        if (digitalRead(WIO_5S_PRESS) == LOW)
+        {
+            backlightOn = !backlightOn;
+            digitalWrite(LCD_BACKLIGHT, backlightOn ? HIGH : LOW);
+        }
+        lastButtonCheck = currentMillis;
+    }
 
     // Regular sensor reading (every 5 seconds)
     if (currentMillis - lastUpdate >= 5000)
@@ -538,8 +559,7 @@ void loop()
     }
 
     // Calculate hourly averages (every hour)
-    if (currentMillis - lastHourlyCalc >= 3600000) {
-    // if (currentMillis - lastHourlyCalc >= 600000)
+    if (currentMillis - lastHourlyCalc >= 3600000)  // Remove extra brace here
     {
         calculateHourlyAverage();
         // Update historical data characteristic
@@ -547,4 +567,4 @@ void loop()
         pHistoryCharacteristic->setValue(historicalData.c_str());
         lastHourlyCalc = currentMillis;
     }
-}
+} // End of loop()

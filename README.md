@@ -52,8 +52,8 @@ A [PlatformIO](https://platformio.org/project) project for the Seeed Wio Termina
 - [Seeed_Arduino_rpcBLE](https://github.com/Seeed-Studio/Seeed_Arduino_rpcBLE)
 - [Seeed_Arduino_rpcUnified](https://github.com/Seeed-Studio/Seeed_Arduino_rpcUnified)
 - TFT_eSPI
-- Seeed_Arduino_FS
-- TimeLib
+- [Seeed_Arduino_FS](https://github.com/Seeed-Studio/Seeed_Arduino_FS)
+- [Seeed_Arduino_RTC](https://github.com/Seeed-Studio/Seeed_Arduino_RTC)
 
 ## Data Storage
 

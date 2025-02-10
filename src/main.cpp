@@ -12,7 +12,8 @@
 #include <BLEServer.h>
 #include <BLEService.h>
 #include <BLECharacteristic.h>
-#include <TimeLib.h>
+#include "RTC_SAMD51.h"
+#include "DateTime.h"
 #include <vector>
 
 // Pin definitions
@@ -35,6 +36,7 @@
 TFT_eSPI tft;
 HM330X sensor;
 uint8_t buf[30];
+RTC_SAMD51 rtc;
 
 // BLE objects
 BLEServer *pServer = nullptr;
@@ -101,7 +103,7 @@ void updateReadings(uint8_t *data)
     readings.pm1_0_atm = (uint16_t)data[10] << 8 | data[11];
     readings.pm2_5_atm = (uint16_t)data[12] << 8 | data[13];
     readings.pm10_atm = (uint16_t)data[14] << 8 | data[15];
-    readings.timestamp = now();
+    readings.timestamp = rtc.now().unixtime(); // Use RTC timestamp
 
     // Update BLE characteristics if connected
     if (deviceConnected)
@@ -153,7 +155,6 @@ String getDateTimeString()
 
     if (!initialized)
     {
-        // Check for existing files to determine power cycle number
         if (SD.exists("/data/power_cycle.txt"))
         {
             File cycleFile = SD.open("/data/power_cycle.txt", FILE_READ);
@@ -163,8 +164,6 @@ String getDateTimeString()
                 cycleFile.close();
             }
         }
-
-        // Increment and save power cycle number
         powerCycle++;
         File cycleFile = SD.open("/data/power_cycle.txt", FILE_WRITE);
         if (cycleFile)
@@ -175,13 +174,16 @@ String getDateTimeString()
         initialized = true;
     }
 
+    DateTime now = rtc.now();
     char datetime[32];
-    unsigned long uptime = millis() / 1000; // Convert to seconds
-    sprintf(datetime, "P%03d_%02lu:%02lu:%02lu",
+    sprintf(datetime, "P%03d_%04d%02d%02d_%02d%02d%02d",
             powerCycle,
-            (uptime / 3600) % 24, // Hours
-            (uptime / 60) % 60,   // Minutes
-            uptime % 60);         // Seconds
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour(),
+            now.minute(),
+            now.second());
     return String(datetime);
 }
 
@@ -288,7 +290,7 @@ void calculateHourlyAverage()
 
     // Skip header line
     String header = dataFile.readStringUntil('\n');
-    
+
     char debugMsg[100];
     snprintf(debugMsg, sizeof(debugMsg), "Processing file: %s", filename.c_str());
     displayDebugInfo(debugMsg);
@@ -297,7 +299,8 @@ void calculateHourlyAverage()
     while (dataFile.available())
     {
         String line = dataFile.readStringUntil('\n');
-        if (line.length() == 0) continue;
+        if (line.length() == 0)
+            continue;
 
         // Debug raw line
         snprintf(debugMsg, sizeof(debugMsg), "Raw line: %s", line.c_str());
@@ -305,14 +308,17 @@ void calculateHourlyAverage()
 
         // Count commas for validation
         int commaCount = 0;
-        for (char c : line) {
-            if (c == ',') commaCount++;
+        for (char c : line)
+        {
+            if (c == ',')
+                commaCount++;
         }
-        
+
         snprintf(debugMsg, sizeof(debugMsg), "Found %d commas in line", commaCount);
         displayDebugInfo(debugMsg);
 
-        if (commaCount < 4) {
+        if (commaCount < 4)
+        {
             displayDebugInfo("Not enough commas, skipping line");
             continue;
         }
@@ -320,11 +326,14 @@ void calculateHourlyAverage()
         // Split the line into fields
         int start = 0;
         int fieldCount = 0;
-        String fields[6];  // To store each field
-        
-        for (int i = 0; i < line.length(); i++) {
-            if (line.charAt(i) == ',' || i == line.length() - 1) {
-                if (i == line.length() - 1) i++;  // Include last character
+        String fields[6]; // To store each field
+
+        for (int i = 0; i < line.length(); i++)
+        {
+            if (line.charAt(i) == ',' || i == line.length() - 1)
+            {
+                if (i == line.length() - 1)
+                    i++; // Include last character
                 fields[fieldCount] = line.substring(start, i);
                 fieldCount++;
                 start = i + 1;
@@ -337,13 +346,13 @@ void calculateHourlyAverage()
         int pm10 = fields[3].toInt();
 
         // Debug extracted values
-        snprintf(debugMsg, sizeof(debugMsg), "Fields: [%s] [%s] [%s] [%s] [%s]", 
-                fields[0].c_str(), fields[1].c_str(), fields[2].c_str(), 
-                fields[3].c_str(), fields[4].c_str());
+        snprintf(debugMsg, sizeof(debugMsg), "Fields: [%s] [%s] [%s] [%s] [%s]",
+                 fields[0].c_str(), fields[1].c_str(), fields[2].c_str(),
+                 fields[3].c_str(), fields[4].c_str());
         displayDebugInfo(debugMsg);
 
-        snprintf(debugMsg, sizeof(debugMsg), "Extracted: PM1.0=%d PM2.5=%d PM10=%d", 
-                pm1_0, pm2_5, pm10);
+        snprintf(debugMsg, sizeof(debugMsg), "Extracted: PM1.0=%d PM2.5=%d PM10=%d",
+                 pm1_0, pm2_5, pm10);
         displayDebugInfo(debugMsg);
 
         // Add to sums
@@ -361,7 +370,7 @@ void calculateHourlyAverage()
         avgReading.pm1_0_atm = pm1_0_sum / count;
         avgReading.pm2_5_atm = pm2_5_sum / count;
         avgReading.pm10_atm = pm10_sum / count;
-        avgReading.timestamp = now();
+        avgReading.timestamp = rtc.now().unixtime(); // Use RTC timestamp
 
         hourlyReadings.push_back(avgReading);
 
@@ -370,9 +379,10 @@ void calculateHourlyAverage()
             hourlyReadings.erase(hourlyReadings.begin());
         }
 
-        snprintf(debugMsg, sizeof(debugMsg), 
-                "Avg calculated: PM1.0=%d PM2.5=%d PM10=%d Count=%d",
-                avgReading.pm1_0_atm, avgReading.pm2_5_atm, avgReading.pm10_atm, count);
+        char debugMsg[100];
+        snprintf(debugMsg, sizeof(debugMsg),
+                 "Avg calculated: PM1.0=%d PM2.5=%d PM10=%d Count=%d",
+                 avgReading.pm1_0_atm, avgReading.pm2_5_atm, avgReading.pm10_atm, count);
         displayDebugInfo(debugMsg);
     }
 }
@@ -381,36 +391,49 @@ void calculateHourlyAverage()
 String getHistoricalData()
 {
     String data = "";
-    unsigned long current_time = now();
-    
+    uint32_t current_time = rtc.now().unixtime(); // Use RTC timestamp
+
     for (const auto &reading : hourlyReadings)
     {
         // Calculate minutes ago instead of using timestamp
         unsigned long minutes_ago = (current_time - reading.timestamp) / 60;
-        
+
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "%lu,%d,%d,%d\n",
-                minutes_ago,
-                reading.pm1_0_atm,
-                reading.pm2_5_atm,
-                reading.pm10_atm);
+                 minutes_ago,
+                 reading.pm1_0_atm,
+                 reading.pm2_5_atm,
+                 reading.pm10_atm);
         data += buffer;
     }
-    
-    if (data.length() == 0) {
+
+    if (data.length() == 0)
+    {
         data = "No historical data available\n";
     }
-    
+
     char debugMsg[50];
     snprintf(debugMsg, sizeof(debugMsg), "Historical data length: %d", data.length());
     displayDebugInfo(debugMsg);
-    
+
     return data;
+}
+
+void displayTime()
+{
+    DateTime now = rtc.now();
+    char timeStr[20];
+    sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
+            now.year(), now.month(), now.day(),
+            now.hour(), now.minute(), now.second());
+
+    tft.setTextColor(TFT_YELLOW);
+    tft.setTextSize(1);
+    tft.drawString(timeStr, 10, 190); // Display at bottom of screen
 }
 
 void setup()
 {
-
     // Initialize serial communication
     Serial.begin(115200);
 
@@ -441,34 +464,19 @@ void setup()
         ensureDataDirectory();
     }
 
-    // Set initial time (you should implement proper time sync)
-    // setTime(0); // Set to epoch start, should be updated with real time
-
-    // Initialize time using compile time
-    const char compile_date[] = __DATE__;
-    const char compile_time[] = __TIME__;
-
-    // Parse compile time strings
-    char month_str[4];
-    int day, year, hour, minute, second;
-    sscanf(compile_date, "%s %d %d", month_str, &day, &year);
-    sscanf(compile_time, "%d:%d:%d", &hour, &minute, &second);
-
-    // Convert month string to number
-    const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    int month = 0;
-    for (int i = 0; i < 12; i++)
+    // Initialize RTC
+    displayDebugInfo("Initializing RTC...");
+    if (!rtc.begin())
     {
-        if (strncmp(month_str, months[i], 3) == 0)
-        {
-            month = i + 1;
-            break;
-        }
+        displayDebugInfo("RTC initialization failed!");
+        while (1)
+            ; // Critical failure - halt program
     }
 
-    // Set time using TimeLib
-    setTime(hour, minute, second, day, month, year);
+    // Set RTC time using compile time
+    DateTime compile_time(F(__DATE__), F(__TIME__));
+    rtc.adjust(compile_time);
+    displayDebugInfo("RTC initialized with compile time");
 
     // Initialize display
     tft.begin();
@@ -514,9 +522,20 @@ void setup()
         HISTORY_CHAR_UUID,
         BLECharacteristic::PROPERTY_READ);
 
-    // Start service and advertising
+    // Start BLE service and advertising
     pService->start();
     pServer->getAdvertising()->start();
+    displayDebugInfo("BLE initialized");
+
+    // Show current time on display
+    DateTime now = rtc.now();
+    char timeStr[32];
+    sprintf(timeStr, "Time: %04d-%02d-%02d %02d:%02d:%02d",
+            now.year(), now.month(), now.day(),
+            now.hour(), now.minute(), now.second());
+    displayDebugInfo(timeStr);
+
+    displayDebugInfo("Setup complete!");
 }
 
 void loop()
@@ -526,7 +545,7 @@ void loop()
     static unsigned long lastHourlyCalc = 0;
     static unsigned long lastButtonCheck = 0;
     static bool backlightOn = true;
-    
+
     unsigned long currentMillis = millis();
 
     // Handle button press for backlight toggle
@@ -547,6 +566,7 @@ void loop()
         {
             updateReadings(buf);
             drawReadings();
+            displayTime();
         }
         lastUpdate = currentMillis;
     }
@@ -559,7 +579,7 @@ void loop()
     }
 
     // Calculate hourly averages (every hour)
-    if (currentMillis - lastHourlyCalc >= 3600000)  // Remove extra brace here
+    if (currentMillis - lastHourlyCalc >= 3600000) // Remove extra brace here
     {
         calculateHourlyAverage();
         // Update historical data characteristic

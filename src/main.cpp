@@ -28,6 +28,7 @@
 #define PM2_5_CHAR_UUID "91bad494-b950-4226-aa2b-4ede9fa42f59"
 #define PM10_CHAR_UUID "91bad495-b950-4226-aa2b-4ede9fa42f59"
 #define HISTORY_CHAR_UUID "91bad496-b950-4226-aa2b-4ede9fa42f59"
+#define TIME_SYNC_CHAR_UUID "91bad497-b950-4226-aa2b-4ede9fa42f59"
 
 // Logging interval (in milliseconds)
 #define LOG_INTERVAL 300000 // 5 minutes
@@ -45,22 +46,8 @@ BLECharacteristic *pPM1_0Characteristic = nullptr;
 BLECharacteristic *pPM2_5Characteristic = nullptr;
 BLECharacteristic *pPM10Characteristic = nullptr;
 BLECharacteristic *pHistoryCharacteristic = nullptr;
+BLECharacteristic *pTimeSyncCharacteristic = nullptr;
 bool deviceConnected = false;
-
-// Structure to hold sensor readings
-struct PMReadings
-{
-    uint16_t pm1_0_std;
-    uint16_t pm2_5_std;
-    uint16_t pm10_std;
-    uint16_t pm1_0_atm;
-    uint16_t pm2_5_atm;
-    uint16_t pm10_atm;
-    time_t timestamp;
-};
-
-PMReadings readings;
-std::vector<PMReadings> hourlyReadings;
 
 void displayDebugInfo(const char *message)
 {
@@ -93,6 +80,55 @@ class MyServerCallbacks : public BLEServerCallbacks
         pServer->getAdvertising()->start();
     }
 };
+
+// Callback class for handling time sync
+class TimeSyncCallback: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+        std::string value = pCharacteristic->getValue();
+        
+        if (value.length() == 8) {
+            // char rawBytes[50];
+            // snprintf(rawBytes, sizeof(rawBytes), "Raw bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+            //         (uint8_t)value[0], (uint8_t)value[1], (uint8_t)value[2], (uint8_t)value[3],
+            //         (uint8_t)value[4], (uint8_t)value[5], (uint8_t)value[6], (uint8_t)value[7]);
+            // displayDebugInfo(rawBytes);
+
+            uint32_t newTime = 
+                ((uint32_t)(uint8_t)value[3] << 24) |
+                ((uint32_t)(uint8_t)value[2] << 16) |
+                ((uint32_t)(uint8_t)value[1] << 8) |
+                ((uint32_t)(uint8_t)value[0]);
+            
+            // char timeValue[50];
+            // snprintf(timeValue, sizeof(timeValue), "Timestamp: %lu", newTime);
+            // displayDebugInfo(timeValue);
+
+            DateTime newDateTime(newTime);
+            rtc.adjust(newDateTime);
+            
+            char timeStr[32];
+            sprintf(timeStr, "Time set to: %04d-%02d-%02d %02d:%02d:%02d",
+                    newDateTime.year(), newDateTime.month(), newDateTime.day(),
+                    newDateTime.hour(), newDateTime.minute(), newDateTime.second());
+            displayDebugInfo(timeStr);
+        }
+    }
+};
+
+// Structure to hold sensor readings
+struct PMReadings
+{
+    uint16_t pm1_0_std;
+    uint16_t pm2_5_std;
+    uint16_t pm10_std;
+    uint16_t pm1_0_atm;
+    uint16_t pm2_5_atm;
+    uint16_t pm10_atm;
+    time_t timestamp;
+};
+
+PMReadings readings;
+std::vector<PMReadings> hourlyReadings;
 
 // Function to update sensor readings
 void updateReadings(uint8_t *data)
@@ -521,6 +557,11 @@ void setup()
     pHistoryCharacteristic = pService->createCharacteristic(
         HISTORY_CHAR_UUID,
         BLECharacteristic::PROPERTY_READ);
+
+    pTimeSyncCharacteristic = pService->createCharacteristic(
+        TIME_SYNC_CHAR_UUID,
+        BLECharacteristic::PROPERTY_WRITE);
+    pTimeSyncCharacteristic->setCallbacks(new TimeSyncCallback());
 
     // Start BLE service and advertising
     pService->start();

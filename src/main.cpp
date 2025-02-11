@@ -82,30 +82,33 @@ class MyServerCallbacks : public BLEServerCallbacks
 };
 
 // Callback class for handling time sync
-class TimeSyncCallback: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
+class TimeSyncCallback : public BLECharacteristicCallbacks
+{
+    void onWrite(BLECharacteristic *pCharacteristic)
+    {
         std::string value = pCharacteristic->getValue();
-        
-        if (value.length() == 8) {
+
+        if (value.length() == 8)
+        {
             // char rawBytes[50];
             // snprintf(rawBytes, sizeof(rawBytes), "Raw bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
             //         (uint8_t)value[0], (uint8_t)value[1], (uint8_t)value[2], (uint8_t)value[3],
             //         (uint8_t)value[4], (uint8_t)value[5], (uint8_t)value[6], (uint8_t)value[7]);
             // displayDebugInfo(rawBytes);
 
-            uint32_t newTime = 
+            uint32_t newTime =
                 ((uint32_t)(uint8_t)value[3] << 24) |
                 ((uint32_t)(uint8_t)value[2] << 16) |
                 ((uint32_t)(uint8_t)value[1] << 8) |
                 ((uint32_t)(uint8_t)value[0]);
-            
+
             // char timeValue[50];
             // snprintf(timeValue, sizeof(timeValue), "Timestamp: %lu", newTime);
             // displayDebugInfo(timeValue);
 
             DateTime newDateTime(newTime);
             rtc.adjust(newDateTime);
-            
+
             char timeStr[32];
             sprintf(timeStr, "Time set to: %04d-%02d-%02d %02d:%02d:%02d",
                     newDateTime.year(), newDateTime.month(), newDateTime.day(),
@@ -431,12 +434,11 @@ String getHistoricalData()
 
     for (const auto &reading : hourlyReadings)
     {
-        // Calculate minutes ago instead of using timestamp
-        unsigned long minutes_ago = (current_time - reading.timestamp) / 60;
-
-        char buffer[64];
-        snprintf(buffer, sizeof(buffer), "%lu,%d,%d,%d\n",
-                 minutes_ago,
+        DateTime readingTime(reading.timestamp);
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%02d:%02d,%d,%d,%d\n",
+                 readingTime.hour(),
+                 readingTime.minute(),
                  reading.pm1_0_atm,
                  reading.pm2_5_atm,
                  reading.pm10_atm);
@@ -620,7 +622,7 @@ void loop()
     }
 
     // Calculate hourly averages (every hour)
-    if (currentMillis - lastHourlyCalc >= 3600000) // Remove extra brace here
+    if (currentMillis - lastHourlyCalc >= 3600000)
     {
         calculateHourlyAverage();
         // Update historical data characteristic

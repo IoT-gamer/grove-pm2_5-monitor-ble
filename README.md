@@ -33,6 +33,8 @@ A [PlatformIO](https://platformio.org/project) project for the Seeed Wio Termina
   - Hourly averages calculation
   - 24-hour history retention
   - Accessible via BLE
+- Time synchronization:
+  - Set the device time via BLE
 
 ## BLE Service Specifications
 
@@ -42,6 +44,7 @@ A [PlatformIO](https://platformio.org/project) project for the Seeed Wio Termina
   - PM2.5: `91bad494-b950-4226-aa2b-4ede9fa42f59` (Read, Notify)
   - PM10: `91bad495-b950-4226-aa2b-4ede9fa42f59` (Read, Notify)
   - History: `91bad496-b950-4226-aa2b-4ede9fa42f59` (Read)
+  - Time Sync: `91bad497-b950-4226-aa2b-4ede9fa42f59` (Write)
 
 ## BLE Client/Central Example App
 - [Flutter PM2.5 Monitor App](https://github.com/IoT-gamer/flutter_pm2_5_monitor_app)

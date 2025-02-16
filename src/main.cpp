@@ -29,6 +29,10 @@
 #define PM10_CHAR_UUID "91bad495-b950-4226-aa2b-4ede9fa42f59"
 #define HISTORY_CHAR_UUID "91bad496-b950-4226-aa2b-4ede9fa42f59"
 #define TIME_SYNC_CHAR_UUID "91bad497-b950-4226-aa2b-4ede9fa42f59"
+#define ALERT_CHAR_UUID "91bad498-b950-4226-aa2b-4ede9fa42f59"
+
+// PM2.5 threshold for alert
+#define PM25_THRESHOLD 35 // µg/m³
 
 // Logging interval (in milliseconds)
 #define LOG_INTERVAL 300000 // 5 minutes
@@ -47,6 +51,7 @@ BLECharacteristic *pPM2_5Characteristic = nullptr;
 BLECharacteristic *pPM10Characteristic = nullptr;
 BLECharacteristic *pHistoryCharacteristic = nullptr;
 BLECharacteristic *pTimeSyncCharacteristic = nullptr;
+BLECharacteristic *pAlertCharacteristic = nullptr;
 bool deviceConnected = false;
 
 void displayDebugInfo(const char *message)
@@ -150,6 +155,21 @@ void updateReadings(uint8_t *data)
         pPM1_0Characteristic->setValue(readings.pm1_0_atm);
         pPM2_5Characteristic->setValue(readings.pm2_5_atm);
         pPM10Characteristic->setValue(readings.pm10_atm);
+
+        // Check PM2.5 threshold and send alert if exceeded
+        if (readings.pm2_5_atm > PM25_THRESHOLD) {
+            char alertMsg[50];
+            snprintf(alertMsg, sizeof(alertMsg), "WARNING: PM2.5 level: %d µg/m³", readings.pm2_5_atm);
+            pAlertCharacteristic->setValue(alertMsg);
+            pAlertCharacteristic->notify();
+            
+            // // Also display warning on screen
+            // tft.setTextColor(TFT_RED);
+            // tft.setTextSize(1);
+            // tft.drawString(alertMsg, 10, 170);
+        } else {
+            pAlertCharacteristic->setValue("OK");
+        }
 
         pPM1_0Characteristic->notify();
         pPM2_5Characteristic->notify();
@@ -564,6 +584,11 @@ void setup()
         TIME_SYNC_CHAR_UUID,
         BLECharacteristic::PROPERTY_WRITE);
     pTimeSyncCharacteristic->setCallbacks(new TimeSyncCallback());
+
+    pAlertCharacteristic = pService->createCharacteristic(
+        ALERT_CHAR_UUID,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+    pAlertCharacteristic->addDescriptor(new BLE2902());
 
     // Start BLE service and advertising
     pService->start();
